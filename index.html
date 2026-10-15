@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Movies</title>
+</head>
+<body>
+  <h1>Movies</h1>
+
+  <input id="title" placeholder="Title">
+  <button onclick="add()">Add</button>
+
+  <hr>
+
+  <select id="pick"></select>
+  <button onclick="edit()">Edit</button>
+  <button onclick="del()">Delete</button>
+
+  <ul id="list"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/pouchdb@9.0.0/dist/pouchdb.min.js"></script>
+  <script>
+    const local  = new PouchDB('movies_local');
+    const remote = new PouchDB('http://admin:admin123@127.0.0.1:5984/movies_schema_a');
+
+    async function render() {
+      const { rows } = await local.allDocs({ include_docs: true });
+      const docs = rows.map(r => r.doc).filter(d => d.title !== undefined);
+
+      const pick = document.getElementById('pick');
+      pick.innerHTML = '';
+      docs.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d._id;
+        opt.textContent = d.title;
+        pick.appendChild(opt);
+      });
+
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      docs.forEach(d => {
+        const li = document.createElement('li');
+        li.textContent = d.title;
+        list.appendChild(li);
+      });
+    }
+
+    async function add() {
+      const title = document.getElementById('title').value.trim();
+      if (!title) return;
+      await local.put({ _id: 'movie_' + Date.now(), title: title });
+      document.getElementById('title').value = '';
+      render();
+    }
+
+    async function edit() {
+      const id = document.getElementById('pick').value;
+      if (!id) return;
+      const doc = await local.get(id);
+      const newTitle = prompt('New title:', doc.title);
+      if (newTitle === null || newTitle.trim() === '') return;
+      doc.title = newTitle.trim();
+      await local.put(doc);
+      render();
+    }
+
+    async function del() {
+      const id = document.getElementById('pick').value;
+      if (!id) return;
+      const doc = await local.get(id);
+      await local.remove(doc);
+      render();
+    }
+
+    local.sync(remote, { live: true, retry: true }).on('change', render);
+    render();
+  </script>
+</body>
+</html>
